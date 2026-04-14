@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 
 const tintColorLight = '#0a7ea4';
 const tintColorDark = '#fff';
+const tintBlue = '#05668d';
 
 export const Colors = {
   light: {
@@ -24,6 +25,15 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+  },
+  /** Mavi tonlu açık tema */
+  blue: {
+    text: '#0a1929',
+    background: '#e3f2fd',
+    tint: tintBlue,
+    icon: '#3e5c76',
+    tabIconDefault: '#3e5c76',
+    tabIconSelected: tintBlue,
   },
 };
 

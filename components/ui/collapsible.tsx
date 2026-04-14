@@ -16,12 +16,15 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
       <TouchableOpacity
         style={styles.heading}
         onPress={() => setIsOpen((value) => !value)}
-        activeOpacity={0.8}>
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: isOpen }}
+        accessibilityLabel={title}>
         <IconSymbol
           name="chevron.right"
           size={18}
           weight="medium"
-          color={theme === 'light' ? Colors.light.icon : Colors.dark.icon}
+          color={Colors[theme].icon}
           style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
         />
 

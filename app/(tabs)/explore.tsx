@@ -1,109 +1,124 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { OsymHeroHeaderBand } from '@/components/osym-hero-header-block';
 import { Collapsible } from '@/components/ui/collapsible';
 import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Fonts } from '@/constants/theme';
 
 export default function TabTwoScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
+    <ThemedView style={styles.screen}>
+      <OsymHeroHeaderBand />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator>
+        <ThemedView style={styles.titleContainer}>
+          <ThemedText
+            type="title"
+            style={{
+              fontFamily: Fonts.rounded,
+            }}>
+            Bilgilendirme
+          </ThemedText>
+        </ThemedView>
+        <ThemedText style={{ opacity: 0.8 }}>
+          Sınav görevlendirmeleri ve tercih süreçleri hakkında kısa bilgilendirmeler.
         </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
+
+        <Collapsible title="Sınavlarda görev alabilmek için tercihlerimi ne zaman yapabilirim?">
+          <ThemedText style={{ opacity: 0.9 }}>
+            ÖSYM görevlilerden tercih toplama işlemlerini aday atama sürecinden sonra yapmaktadır.{' '}
+            <ExternalLink href="https://www.osym.gov.tr/">
+              <ThemedText type="link">www.osym.gov.tr</ThemedText>
+            </ExternalLink>{' '}
+            adresinde yer alan Sınav Takvimindeki sınav tarihlerinden 13 ile 25 gün önce görevlilerden
+            tercih toplamaktadır. Tercih yapacak görevliler bu tarihleri dikkate alarak{' '}
+            <ExternalLink href="https://gis.osym.gov.tr/">
+              <ThemedText type="link">https://gis.osym.gov.tr</ThemedText>
+            </ExternalLink>{' '}
+            internet adresinden görev tercihinde bulunabilirler.
+          </ThemedText>
+        </Collapsible>
+
+        <Collapsible title="Görev ücretim hesabıma neden yatmadı?">
+          <ThemedText style={{ opacity: 0.9 }}>
+            Görev ücreti aşağıdaki nedenlerden dolayı IBAN hesaplarına yatırılamamaktadır.
+          </ThemedText>
+          <ThemedView style={{ gap: 6, marginTop: 10 }}>
+            <ThemedText style={{ opacity: 0.9 }}>- GİS sisteminde kayıtlı olan IBAN numaranızın hatalı olması</ThemedText>
+            <ThemedText style={{ opacity: 0.9 }}>
+              - Sisteme kayıtlı olan kişisel bilgileriniz ile IBAN numarasının bağlı bulunduğu bankadaki kişisel bilgilerinizin uyuşmaması
             </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+            <ThemedText style={{ opacity: 0.9 }}>
+              - Binalarda yapılan görev değişikliğinin sisteme yansıtılmamasından kaynaklanan eksikliklerden dolayı
+            </ThemedText>
+            <ThemedText style={{ opacity: 0.9 }}>
+              - Sınav değerlendirme raporlarının doldurulmamasından dolayı ödeme yapılamamaktadır.
+            </ThemedText>
+          </ThemedView>
+        </Collapsible>
+
+        <Collapsible title="Diğer Sıkça Sorulan Sorular">
+          <ThemedText style={{ opacity: 0.9 }}>
+            Kaynak:{' '}
+            <ExternalLink href="https://gis.osym.gov.tr/">
+              <ThemedText type="link">https://gis.osym.gov.tr</ThemedText>
+            </ExternalLink>{' '}
+            adresinden <ThemedText style={{ fontWeight: '800' }}>Sıkça Sorulan Sorular</ThemedText> bölümünden ulaşabilirsiniz.
+          </ThemedText>
+        </Collapsible>
+
+        <Collapsible title="ÖSYM e-İşlemler">
+          <ThemedView style={{ gap: 10 }}>
+            <View>
+              <ThemedText style={{ fontWeight: '800' }}>Aday İşlemleri Sistemi</ThemedText>
+              <ExternalLink href="https://ais.osym.gov.tr/">
+                <ThemedText type="link">https://ais.osym.gov.tr</ThemedText>
+              </ExternalLink>
+            </View>
+
+            <View>
+              <ThemedText style={{ fontWeight: '800' }}>Görevli İşlemleri Sistemi</ThemedText>
+              <ExternalLink href="https://gis.osym.gov.tr/">
+                <ThemedText type="link">https://gis.osym.gov.tr</ThemedText>
+              </ExternalLink>
+            </View>
+
+            <View>
+              <ThemedText style={{ fontWeight: '800' }}>Sonuç Açıklama Sistemi</ThemedText>
+              <ExternalLink href="https://sonuc.osym.gov.tr/">
+                <ThemedText type="link">https://sonuc.osym.gov.tr</ThemedText>
+              </ExternalLink>
+            </View>
+
+            <View>
+              <ThemedText style={{ fontWeight: '800' }}>Ödeme İşlemleri Sistemi</ThemedText>
+              <ExternalLink href="https://sanalpos.osym.gov.tr/">
+                <ThemedText type="link">https://sanalpos.osym.gov.tr</ThemedText>
+              </ExternalLink>
+            </View>
+          </ThemedView>
+        </Collapsible>
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  screen: {
+    flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 32,
+    gap: 16,
+    paddingBottom: 40,
   },
   titleContainer: {
     flexDirection: 'row',

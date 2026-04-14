@@ -1,0 +1,28 @@
+# Maestro: https://maestro.mobile.dev
+# Kurulum: curl -Ls "https://get.maestro.mobile.dev" | bash
+# Çalıştır: npm run test:e2e
+#
+# Expo Go iOS: host.exp.Exponent  |  Android Expo Go: host.exp.exponent
+# Web’de bildirim anahtarı kapalıdır; bu akış native simülatör/cihaz içindir.
+
+appId: host.exp.Exponent
+---
+- launchApp
+- extendedWaitUntil:
+    visible: 'Hoş geldin'
+    timeout: 60000
+- tapOn: 'ÖSYM Takvimi'
+- assertVisible: 'Görev tercihi'
+- scrollUntilVisible:
+    element:
+      id: 'e2e-takvim-notify-switch'
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: 'e2e-takvim-notify-switch'
+- tapOn:
+    id: 'e2e-takvim-notify-switch'
+- tapOn: 'Bilgilendirme'
+- assertVisible: 'Görünüm'
+- tapOn: 'Home'
+- assertVisible: 'Hoş geldin'

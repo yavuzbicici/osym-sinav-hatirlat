@@ -26,15 +26,24 @@ export default function TabLayout() {
       <Tabs.Screen
         name="takvim"
         options={{
-          title: 'Takvim',
+          title: 'ÖSYM Takvimi',
+          tabBarLabel: 'ÖSYM Takvimi',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
+          title: 'Bilgilendirme',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="ayarlar"
+        options={{
+          title: 'Ayarlar',
+          tabBarLabel: 'Ayarlar',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
         }}
       />
     </Tabs>
