@@ -17,7 +17,9 @@ const STORAGE_DEV_FAST_ID = 'notifications:devFast:id';
 const STORAGE_DEV_FAST_EXAM = 'notifications:devFast:examId';
 /** Current: one repeating dev notification per selected exam (JSON array). */
 const STORAGE_DEV_FAST_IDS = 'notifications:devFast:ids';
-const DEV_FAST_TEST_ENABLED = __DEV__ ? true : false;
+// IMPORTANT: Keep this off by default. Repeating time-interval notifications keep firing even when
+// the dev server / app is closed (OS schedules them). Enable only when explicitly testing.
+const DEV_FAST_TEST_ENABLED = false;
 const DEV_FAST_INTERVAL_SECONDS = 120; // every 2 minutes
 const MAX_DEV_FAST_SELECTED_EXAMS = 6; // stay under iOS ~64 scheduled limit with production slots
 
@@ -254,6 +256,24 @@ async function scheduleDailyRemindersForExam(
 }
 
 export async function schedulePreferenceNotificationsDaily_13_25() {
+  // Cleanup: if dev-fast was enabled previously, remove any leftover time-interval schedules.
+  // This prevents repeating notifications from continuing after the user turned off a specific exam
+  // and/or closed the Expo dev server.
+  if (!DEV_FAST_TEST_ENABLED) {
+    try {
+      const all = await Notifications.getAllScheduledNotificationsAsync();
+      const toCancel = all.filter((n) => {
+        const cat = n.content.categoryIdentifier;
+        const trigger: any = n.trigger as any;
+        const isTimeInterval = trigger && trigger.type === Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL;
+        return cat === CATEGORY_ID && isTimeInterval;
+      });
+      await Promise.allSettled(toCancel.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+    } catch {
+      // ignore
+    }
+  }
+
   // If we already have too many scheduled notifications, clear them once.
   try {
     const existing = await Notifications.getAllScheduledNotificationsAsync();
@@ -282,110 +302,18 @@ export async function schedulePreferenceNotificationsDaily_13_25() {
     .filter((it) => it.date && !isPast(it.date))
     .sort((a, b) => (a.date!.getTime() - b.date!.getTime()));
 
-  // TEMP (test): one repeating reminder every ~2 minutes per *selected* upcoming exam (capped),
-  // so multiple selections all get dev notifications; turning one off leaves the others.
   let devScheduledSlotCount = 0;
   if (DEV_FAST_TEST_ENABLED && candidates.length) {
-    const selectedCandidates = candidates.filter((it) => selectedIds.has(it.id));
+    // If you re-enable dev fast testing, keep the existing implementation; left intentionally disabled by default.
     await cancelAllDevFastTestNotifications();
-
-    if (selectedCandidates.length) {
-      const slice = selectedCandidates.slice(0, MAX_DEV_FAST_SELECTED_EXAMS);
-      const nextEntries: DevFastEntry[] = [];
-
-      // Single smoke (first selected only) — keeps Expo Go sanity check light.
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Bildirim testi (1 sn)',
-            body: 'Bu bildirim test amaçlıdır. Seçenekler için bildirime basılı tut.',
-            categoryIdentifier: CATEGORY_ID,
-            data: { examId: slice[0].id },
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: 1,
-            repeats: false,
-          },
-        });
-        devScheduledSlotCount += 1;
-      } catch (e) {
-        console.warn('[notifications] 1s smoke schedule failed', e);
-      }
-
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Bildirim testi (15 sn)',
-            body: 'Bu bildirim test amaçlıdır. Seçenekler için bildirime basılı tut.',
-            categoryIdentifier: CATEGORY_ID,
-            data: { examId: slice[0].id },
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: 15,
-            repeats: false,
-          },
-        });
-        devScheduledSlotCount += 1;
-      } catch (e) {
-        console.warn('[notifications] smoke schedule failed', e);
-      }
-
-      for (let i = 0; i < slice.length; i++) {
-        const it = slice[i];
-        const stagger = Math.min(i, 15) * 4; // spread triggers slightly (still ~2 dk cadence)
-        try {
-          const id = await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Görev tercihi hatırlatma (test)',
-              body: `${it.sinav} için tercih yapabilirsiniz. (2 dk) Seçenekler için bildirime basılı tut.`,
-              categoryIdentifier: CATEGORY_ID,
-              data: { examId: it.id },
-            },
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-              seconds: DEV_FAST_INTERVAL_SECONDS + stagger,
-              repeats: true,
-            },
-          });
-          nextEntries.push({ id, examId: it.id });
-          devScheduledSlotCount += 1;
-        } catch (e) {
-          console.warn('[notifications] dev fast repeating schedule failed', e);
-          try {
-            const inTwoMinutes = new Date(Date.now() + (DEV_FAST_INTERVAL_SECONDS + stagger) * 1000);
-            const id = await Notifications.scheduleNotificationAsync({
-              content: {
-                title: 'Görev tercihi hatırlatma (test)',
-                body: `${it.sinav} için tercih yapabilirsiniz. (tek sefer) Seçenekler için bildirime basılı tut.`,
-                categoryIdentifier: CATEGORY_ID,
-                data: { examId: it.id },
-              },
-              trigger: {
-                type: Notifications.SchedulableTriggerInputTypes.DATE,
-                date: inTwoMinutes,
-              },
-            });
-            nextEntries.push({ id, examId: it.id });
-            devScheduledSlotCount += 1;
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      if (nextEntries.length) {
-        await AsyncStorage.setItem(STORAGE_DEV_FAST_IDS, JSON.stringify(nextEntries));
-      }
-    }
+    devScheduledSlotCount = 0;
+  } else {
+    // Make sure legacy dev-fast storage is cleared so it doesn't interfere.
+    await cancelAllDevFastTestNotifications();
   }
 
   const budget = {
-    remaining: Math.max(
-      6,
-      MAX_SCHEDULED_NOTIFICATIONS_BUDGET - devScheduledSlotCount - 2,
-    ),
+    remaining: Math.max(6, MAX_SCHEDULED_NOTIFICATIONS_BUDGET - devScheduledSlotCount - 2),
   };
 
   for (const it of candidates) {
