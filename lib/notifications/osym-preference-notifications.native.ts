@@ -6,7 +6,6 @@ import { fetchOsymTakvim } from '@/lib/osym/takvim';
 import { getSelectedExamIds, setExamNotificationSelected } from '@/lib/notifications/selected-exams';
 
 const CATEGORY_ID = 'osym_preference_reminder';
-const ACTION_OPEN_GIS = 'OPEN_GIS';
 const ACTION_DISABLE_EXAM = 'DISABLE_EXAM';
 
 const STORAGE_SCHEDULED_PREFIX = 'notifications:scheduledIds:';
@@ -22,7 +21,6 @@ const DEV_FAST_TEST_ENABLED = __DEV__ ? true : false;
 const DEV_FAST_INTERVAL_SECONDS = 120; // every 2 minutes
 const MAX_DEV_FAST_SELECTED_EXAMS = 6; // stay under iOS ~64 scheduled limit with production slots
 
-const GIS_URL = 'https://gis.osym.gov.tr/';
 const MAX_SCHEDULED_NOTIFICATIONS_BUDGET = 56; // keep under iOS ~64 limit
 const SCHEDULING_HORIZON_DAYS = 120; // don't schedule very far exams
 
@@ -153,23 +151,20 @@ export async function processNotificationResponseActions(
   if (actionId === ACTION_DISABLE_EXAM) {
     if (examId) {
       await disableExamNotifications(examId);
+      // Extra safety: re-run scheduling to ensure any repeating/dev schedules are fully cleaned up
+      // and other selected exams stay scheduled.
+      try {
+        await schedulePreferenceNotificationsDaily_13_25();
+      } catch {
+        // ignore
+      }
     }
     return;
-  }
-
-  if (actionId === ACTION_OPEN_GIS) {
-    const { Linking: RNLinking } = await import('react-native');
-    await RNLinking.openURL(GIS_URL);
   }
 }
 
 export async function ensureNotificationCategory() {
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
-    {
-      identifier: ACTION_OPEN_GIS,
-      buttonTitle: 'GİS’e Git',
-      options: { opensAppToForeground: true },
-    },
     {
       identifier: ACTION_DISABLE_EXAM,
       buttonTitle: 'Bu sınav için bildirimi kapat',
