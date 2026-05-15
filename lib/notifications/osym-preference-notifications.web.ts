@@ -22,3 +22,7 @@ export async function flushPendingNotificationResponse() {
   // no-op on web
 }
 
+/** Avoid importing `expo-notifications` in root layout — it breaks SSR on web. */
+export async function bootstrapAppNotifications(): Promise<() => void> {
+  return () => {};
+}

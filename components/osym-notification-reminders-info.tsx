@@ -19,8 +19,18 @@ export function OsymNotificationRemindersInfo() {
         <ThemedText style={styles.infoCardTitle}>Bildirim hatırlatmaları</ThemedText>
         <ThemedText style={styles.infoCardText}>
           İstediğiniz sınavlarda <ThemedText style={{ fontWeight: '800' }}>Bildirim</ThemedText>’i açın. Seçtikleriniz için
-          tercih hatırlatması <ThemedText style={{ fontWeight: '800' }}>09:00</ThemedText>’da planlanır.
+          görev tercihi hatırlatması <ThemedText style={{ fontWeight: '800' }}>09:00</ThemedText>’da planlanır.
           {Platform.OS === 'web' ? ' Web’de zamanlama yok; seçimler kaydedilir.' : ''}
+        </ThemedText>
+        <ThemedText style={styles.infoCardText}>
+          {'\u2022 '}
+          Sınavdan <ThemedText style={{ fontWeight: '800' }}>25</ThemedText> ile{' '}
+          <ThemedText style={{ fontWeight: '800' }}>13</ThemedText> gün önce arası (dahil), her gün{' '}
+          <ThemedText style={{ fontWeight: '800' }}>09:00</ThemedText>.
+          {'\n\u2022 '}
+          Ek olarak sınavdan <ThemedText style={{ fontWeight: '800' }}>10</ThemedText> ve{' '}
+          <ThemedText style={{ fontWeight: '800' }}>3</ThemedText> gün önce, yine{' '}
+          <ThemedText style={{ fontWeight: '800' }}>09:00</ThemedText>’da tek seferlik hatırlatma.
         </ThemedText>
       </View>
     </View>
@@ -45,7 +55,7 @@ const styles = StyleSheet.create({
   },
   infoCardBody: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   infoCardTitle: {
     fontWeight: '800',

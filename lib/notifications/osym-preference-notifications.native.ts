@@ -1,7 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
+import { AppState, Platform } from 'react-native';
 
+import {
+  ANDROID_NATIVE_NOTIFICATIONS,
+  androidCancelExamAlarms,
+  androidConsumePendingDisableExamId,
+  androidGetScheduledAlarmCount,
+  androidRequestNotificationPermission,
+  androidSchedulePreferenceNotifications,
+} from '@/lib/notifications/android-osym-notifications';
 import { fetchOsymTakvim } from '@/lib/osym/takvim';
 import { getSelectedExamIds, setExamNotificationSelected } from '@/lib/notifications/selected-exams';
 
@@ -11,17 +20,19 @@ const ACTION_DISABLE_EXAM = 'DISABLE_EXAM';
 const STORAGE_SCHEDULED_PREFIX = 'notifications:scheduledIds:';
 const STORAGE_SCHEDULE_KEY_PREFIX = 'notifications:scheduleKey:';
 
-// Dev/test helpers (temporary). Set to false when done.
-/** Legacy single dev notification (migration). */
+/** Legacy dev notification storage / migration helpers. */
 const STORAGE_DEV_FAST_ID = 'notifications:devFast:id';
 const STORAGE_DEV_FAST_EXAM = 'notifications:devFast:examId';
-/** Current: one repeating dev notification per selected exam (JSON array). */
+/** Persists expo notification ids for phone test + legacy dev schedules (JSON array). */
 const STORAGE_DEV_FAST_IDS = 'notifications:devFast:ids';
-// IMPORTANT: Keep this off by default. Repeating time-interval notifications keep firing even when
-// the dev server / app is closed (OS schedules them). Enable only when explicitly testing.
-const DEV_FAST_TEST_ENABLED = false;
-const DEV_FAST_INTERVAL_SECONDS = 120; // every 2 minutes
-const MAX_DEV_FAST_SELECTED_EXAMS = 6; // stay under iOS ~64 scheduled limit with production slots
+
+/**
+ * Mobil bildirim testi: üretim mantığını devre dışı bırakır; bildirimi açtığın her sınav için
+ * TEK seferlik hatırlatıcı ~N saniye sonra gelir (TIME_INTERVAL, repeats: false).
+ * Mağaza / yayın öncesi mutlaka `false` yap.
+ */
+const PHONE_NOTIFICATION_TEST_ENABLED = true;
+const PHONE_NOTIFICATION_TEST_DELAY_SECONDS = 120;
 
 const MAX_SCHEDULED_NOTIFICATIONS_BUDGET = 56; // keep under iOS ~64 limit
 const SCHEDULING_HORIZON_DAYS = 120; // don't schedule very far exams
@@ -129,6 +140,7 @@ function examIdFromNotificationData(data: unknown): string {
 
 /** Handle cold start: interaction is in getLastNotificationResponse, not always delivered to the listener. */
 export async function flushPendingNotificationResponse(): Promise<void> {
+  if (ANDROID_NATIVE_NOTIFICATIONS) return;
   try {
     const last = await Notifications.getLastNotificationResponseAsync();
     if (!last) return;
@@ -166,6 +178,7 @@ export async function processNotificationResponseActions(
 }
 
 export async function ensureNotificationCategory() {
+  if (ANDROID_NATIVE_NOTIFICATIONS) return;
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
     {
       identifier: ACTION_DISABLE_EXAM,
@@ -176,6 +189,9 @@ export async function ensureNotificationCategory() {
 }
 
 export async function requestNotificationPermission() {
+  if (ANDROID_NATIVE_NOTIFICATIONS) {
+    return androidRequestNotificationPermission();
+  }
   const settings = await Notifications.getPermissionsAsync();
   if (settings.granted) return { granted: true };
   const req = await Notifications.requestPermissionsAsync();
@@ -184,6 +200,10 @@ export async function requestNotificationPermission() {
 
 export async function disableExamNotifications(examId: string) {
   await setExamNotificationSelected(examId, false);
+  if (ANDROID_NATIVE_NOTIFICATIONS) {
+    await androidCancelExamAlarms(examId);
+    return;
+  }
   await removeDevFastNotificationsForExam(examId);
   await clearScheduledNotificationsForExam(examId);
 }
@@ -255,11 +275,56 @@ async function scheduleDailyRemindersForExam(
   await AsyncStorage.setItem(getScheduledIdsKey(examId), JSON.stringify(scheduledIds));
 }
 
+async function schedulePhoneTestNotificationOnce(
+  examId: string,
+  examName: string,
+  budget: { remaining: number },
+) {
+  if (budget.remaining <= 0) return;
+
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Görev tercihi hatırlatma (test)',
+        body: `${examName}: yaklaşık ${PHONE_NOTIFICATION_TEST_DELAY_SECONDS}s sonra — mobil bildirim testi.`,
+        categoryIdentifier: CATEGORY_ID,
+        data: { examId },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: PHONE_NOTIFICATION_TEST_DELAY_SECONDS,
+        repeats: false,
+      },
+    });
+
+    budget.remaining -= 1;
+
+    const raw = await AsyncStorage.getItem(STORAGE_DEV_FAST_IDS);
+    const list: DevFastEntry[] = raw ? JSON.parse(raw) : [];
+    list.push({ id, examId });
+    await AsyncStorage.setItem(STORAGE_DEV_FAST_IDS, JSON.stringify(list));
+    await AsyncStorage.setItem(getScheduledIdsKey(examId), JSON.stringify([id]));
+  } catch {
+    // ignore (OS limits, etc.)
+  }
+}
+
 export async function schedulePreferenceNotificationsDaily_13_25() {
-  // Cleanup: if dev-fast was enabled previously, remove any leftover time-interval schedules.
-  // This prevents repeating notifications from continuing after the user turned off a specific exam
-  // and/or closed the Expo dev server.
-  if (!DEV_FAST_TEST_ENABLED) {
+  if (ANDROID_NATIVE_NOTIFICATIONS) {
+    const selectedIds = new Set(await getSelectedExamIds());
+    const { items } = await fetchOsymTakvim();
+    for (const it of items) {
+      if (!selectedIds.has(it.id)) {
+        await androidCancelExamAlarms(it.id);
+      }
+    }
+    const result = await androidSchedulePreferenceNotifications();
+    console.log('[notifications] android native scheduled:', result.scheduled);
+    return;
+  }
+
+  // When phone test is off, strip any leftover time-interval reminders for our category (test or old dev experiments).
+  if (!PHONE_NOTIFICATION_TEST_ENABLED) {
     try {
       const all = await Notifications.getAllScheduledNotificationsAsync();
       const toCancel = all.filter((n) => {
@@ -302,18 +367,10 @@ export async function schedulePreferenceNotificationsDaily_13_25() {
     .filter((it) => it.date && !isPast(it.date))
     .sort((a, b) => (a.date!.getTime() - b.date!.getTime()));
 
-  let devScheduledSlotCount = 0;
-  if (DEV_FAST_TEST_ENABLED && candidates.length) {
-    // If you re-enable dev fast testing, keep the existing implementation; left intentionally disabled by default.
-    await cancelAllDevFastTestNotifications();
-    devScheduledSlotCount = 0;
-  } else {
-    // Make sure legacy dev-fast storage is cleared so it doesn't interfere.
-    await cancelAllDevFastTestNotifications();
-  }
+  await cancelAllDevFastTestNotifications();
 
   const budget = {
-    remaining: Math.max(6, MAX_SCHEDULED_NOTIFICATIONS_BUDGET - devScheduledSlotCount - 2),
+    remaining: Math.max(6, MAX_SCHEDULED_NOTIFICATIONS_BUDGET - 2),
   };
 
   for (const it of candidates) {
@@ -324,8 +381,11 @@ export async function schedulePreferenceNotificationsDaily_13_25() {
 
     if (!selectedIds.has(it.id)) continue;
 
+    const scheduleKey = PHONE_NOTIFICATION_TEST_ENABLED
+      ? `${it.id}__PHONE_TEST_${PHONE_NOTIFICATION_TEST_DELAY_SECONDS}`
+      : `${it.id}__${it.sinavTarihi}__${REMINDER_HOUR}:${String(REMINDER_MINUTE).padStart(2, '0')}`;
+
     // Idempotency: only schedule if scheduleKey changed (e.g., date updated).
-    const scheduleKey = `${it.id}__${it.sinavTarihi}__${REMINDER_HOUR}:${String(REMINDER_MINUTE).padStart(2, '0')}`;
     const prevKey = await AsyncStorage.getItem(getScheduleKeyKey(it.id));
     if (prevKey === scheduleKey) {
       // If OS/Expo Go cleared scheduled notifications but AsyncStorage still has the key,
@@ -344,7 +404,11 @@ export async function schedulePreferenceNotificationsDaily_13_25() {
     );
     await AsyncStorage.removeItem(getScheduledIdsKey(it.id));
 
-    await scheduleDailyRemindersForExam(it.id, it.sinav, it.date, budget);
+    if (PHONE_NOTIFICATION_TEST_ENABLED) {
+      await schedulePhoneTestNotificationOnce(it.id, it.sinav, budget);
+    } else {
+      await scheduleDailyRemindersForExam(it.id, it.sinav, it.date, budget);
+    }
     await AsyncStorage.setItem(getScheduleKeyKey(it.id), scheduleKey);
   }
 
@@ -358,3 +422,101 @@ export function attachNotificationResponseListener() {
   return () => sub.remove();
 }
 
+/**
+ * Root notifications wiring (handlers, listeners, schedules).
+ * Implemented here so `_layout.tsx` never imports `expo-notifications` — that crashes web SSR when
+ * Node's incomplete `localStorage` triggers inside expo-notifications' web module during render.
+ */
+export async function bootstrapAppNotifications(): Promise<() => void> {
+  if (!ANDROID_NATIVE_NOTIFICATIONS) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  }
+
+  await ensureNotificationCategory();
+  const detach = attachNotificationResponseListener();
+  await flushPendingNotificationResponse();
+
+  if (ANDROID_NATIVE_NOTIFICATIONS) {
+    const pendingDisable = await androidConsumePendingDisableExamId();
+    if (pendingDisable) {
+      await disableExamNotifications(pendingDisable);
+    }
+  }
+
+  const perm = await requestNotificationPermission();
+  console.log('[notifications] permission granted:', perm.granted);
+  if (!perm.granted) return detach;
+
+  if (__DEV__ && Platform.OS === 'ios') {
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Bildirim testi (1 sn)',
+          body: 'Eğer bunu görüyorsan bildirim gösterimi çalışıyor. Seçenekler için bildirime basılı tut.',
+          categoryIdentifier: CATEGORY_ID,
+          data: { examId: 'dev' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 1,
+          repeats: false,
+        },
+      });
+      console.log('[notifications] scheduled immediate test notification:', id);
+    } catch (e) {
+      console.warn('[notifications] immediate schedule failed', e);
+    }
+  }
+
+  await schedulePreferenceNotificationsDaily_13_25();
+
+  let appStateSub: { remove: () => void } | undefined;
+  if (ANDROID_NATIVE_NOTIFICATIONS) {
+    appStateSub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      void (async () => {
+        const pendingDisable = await androidConsumePendingDisableExamId();
+        if (!pendingDisable) return;
+        await disableExamNotifications(pendingDisable);
+        try {
+          await schedulePreferenceNotificationsDaily_13_25();
+        } catch {
+          // ignore
+        }
+      })();
+    });
+  }
+
+  try {
+    if (ANDROID_NATIVE_NOTIFICATIONS) {
+      const count = await androidGetScheduledAlarmCount();
+      console.log('[notifications] android alarm count:', count);
+    } else {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      console.log('[notifications] scheduled count:', scheduled.length);
+      if (scheduled.length) {
+        console.log(
+          '[notifications] first scheduled:',
+          scheduled[0]?.content?.title,
+          scheduled[0]?.content?.body,
+          scheduled[0]?.trigger,
+        );
+      }
+    }
+  } catch (e) {
+    console.warn('[notifications] unable to read scheduled notifications', e);
+  }
+
+  return () => {
+    detach();
+    appStateSub?.remove();
+  };
+}

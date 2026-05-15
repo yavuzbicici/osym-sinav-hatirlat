@@ -363,7 +363,6 @@ export default function TakvimScreen() {
                     accessibilityHint="Açıkken bu sınav için görev tercihi hatırlatması planlanır."
                     value={notifyIds.has(item.id)}
                     onValueChange={(v) => void onToggleExamNotify(item, v)}
-                    disabled={Platform.OS === 'web'}
                     trackColor={{ false: isDark ? '#3A3F45' : '#D8DDE3', true: `${colors.tint}99` }}
                     thumbColor={notifyIds.has(item.id) ? colors.tint : isDark ? '#9BA1A6' : '#f4f3f4'}
                   />
