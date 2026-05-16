@@ -28,13 +28,17 @@ class OsymNotificationsModule : Module() {
     }
 
     AsyncFunction("cancelAllAlarms") {
-      val context = appContext.reactContext ?: return@AsyncFunction
-      OsymNotificationScheduler.cancelAll(context)
+      val context = appContext.reactContext
+      if (context != null) {
+        OsymNotificationScheduler.cancelAll(context)
+      }
     }
 
     AsyncFunction("cancelExamAlarms") { examId: String ->
-      val context = appContext.reactContext ?: return@AsyncFunction
-      OsymNotificationScheduler.cancelExam(context, examId)
+      val context = appContext.reactContext
+      if (context != null) {
+        OsymNotificationScheduler.cancelExam(context, examId)
+      }
     }
 
     AsyncFunction("requestPermissions") {
